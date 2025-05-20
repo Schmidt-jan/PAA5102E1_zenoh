@@ -1,18 +1,21 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <zenoh-pico.h>
+#include <paa5102e1.hpp>
 #include "secrets.h"
-
-#define PUB_FREQ_HZ 1
-#define ZENOH_MODE "client"
-#define LOCATOR ""
-
-#define ROS_TOPIC "test"
-#define KEYEXPR_PUB "0/" ROS_TOPIC "/std_msgs::msg::dds_::String_/RIHS01_df668c740482bbd48fb39d76a70dfd4bd59db1288021743503259e948f6b1a18"
+#include "sensor_queriables.hpp"
 
 z_owned_publisher_t pub;
-z_owned_session_t s;
+z_owned_session_t session;
 z_publisher_put_options_t options;
+std::unique_ptr<PAA5102E1> sensor_ptr;
+std::unique_ptr<Z_PAA5102E1_Handler> handler_ptr;
+
+z_owned_queryable_t q_reset, q_sleep, q_awake, q_isWriteProtected, q_isSleeping, q_isAwake,
+    q_enableWriteProtection, q_disableWriteProtection, q_writeLaserDriveCurrent,
+    q_readLaserDriveCurrent, q_readDeltaX, q_readDeltaY, q_readShutter,
+    q_readFrameAvg, q_readImageQuality, q_readResolutionX, q_readResolutionY,
+    q_writeResolutionX, q_writeResolutionY, q_start, q_stop, q_setFrequency;
 
 void init_serial()
 {
@@ -53,7 +56,7 @@ void init_zenoh()
 
   // Open Zenoh session
   Serial.print("Opening Zenoh Session... \t");
-  if (z_open(&s, z_config_move(&config), NULL) < 0)
+  if (z_open(&session, z_config_move(&config), NULL) < 0)
   {
     Serial.println("Unable to open session!");
     while (1)
@@ -64,110 +67,41 @@ void init_zenoh()
   Serial.println("OK");
 
   // Start read and lease tasks for zenoh-pico
-  if (zp_start_read_task(z_session_loan_mut(&s), NULL) < 0 || zp_start_lease_task(z_session_loan_mut(&s), NULL) < 0)
+  if (zp_start_read_task(z_session_loan_mut(&session), NULL) < 0 || zp_start_lease_task(z_session_loan_mut(&session), NULL) < 0)
   {
     Serial.println("Unable to start read and lease tasks\n");
-    z_session_drop(z_session_move(&s));
+    z_session_drop(z_session_move(&session));
     while (1)
     {
       ;
     }
   }
 }
-
 
 void setup()
 {
+  
   init_serial();
   init_wifi();
   init_zenoh();
+  
+  SPI.begin();
+  sensor_ptr = std::make_unique<PAA5102E1>(SPISettings(1000000, MSBFIRST, SPI_MODE3), 5, 4);
+  auto res = sensor_ptr->init();
 
-
-  Serial.println("Declaring publisher for " + String(KEYEXPR_PUB));
-  z_view_keyexpr_t ke_pub;
-
-  z_view_keyexpr_from_str_unchecked(&ke_pub, KEYEXPR_PUB);
-  if (z_declare_publisher(z_session_loan(&s), &pub, z_view_keyexpr_loan(&ke_pub), NULL) < 0)
+  if (res.hasError)
   {
-    Serial.println("Unable to declare publisher for key expression!");
+    Serial.printf("Failed to initialize sensor: %s\n", res.error.toString());
     while (1)
     {
       ;
     }
   }
-  
 
-  // Init liveliness
-  String idStr = "";
-  for (int i = 0; i < ZENOH_ID_SIZE; i++) {
-    if (s._rc._val->_local_zid.id[i] < 0x10) idStr += "0";  // Ensure 2-digit hex
-    idStr += String(s._rc._val->_local_zid.id[i], HEX);
-  }
-
-  auto expr = String("@/" + idStr + "/@ros2_lv/MP/" + ROS_TOPIC + "/std_msgs::msg::String/:::");
-  z_view_keyexpr_t liveliness_ke;
-  z_view_keyexpr_from_str(&liveliness_ke, expr.c_str());
-
-  z_loaned_session_t l_s = *z_session_loan(&s);
-  z_owned_liveliness_token_t token;
-  z_loaned_keyexpr_t keyexpr = *z_view_keyexpr_loan(&liveliness_ke);
-  z_liveliness_token_options_t options;
-  z_liveliness_token_options_default(&options);
-  z_result_t res = z_liveliness_declare_token(&l_s, &token, &keyexpr, &options);
-  if (res != _Z_RES_OK) {
-    Serial.println("Error initializing liveliness token. Result code: " + String(res));
-  } else {
-    Serial.println("Liveliness sucessfully sent");
-  }
-
-  Serial.println("Initialization Done");
+  handler_ptr = std::make_unique<Z_PAA5102E1_Handler>(z_session_loan_mut(&session), "sensor/1", std::move(sensor_ptr));
+  handler_ptr->setup_queryables();
 }
 
-int64_t sequence_number = 0;
-
-
-void loop()
-{
-  const uint8_t data[] = {
-    0x00, 0x01, 0x00, 0x00,             // Encapsulation: dummy byte = 0x00, encoding = 0x01 (PLAIN_CDR, little endian), extend to four bytes
-    0x06, 0x00, 0x00, 0x00,             // String length (6 bytes: "hello" + null)
-    0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x00  // "hello\0"
-};
-  z_owned_bytes_t payload;
-  z_bytes_from_static_buf(&payload, data, sizeof(data));
-
-  z_publisher_put_options_default(&options);
-  z_owned_bytes_t attachment;
-  z_bytes_empty(&attachment);
-
-  z_owned_encoding_t encoding;
-  z_encoding_from_str(&encoding, "zenoh/string;utf8");
-  z_moved_encoding_t *mvd_enc = z_encoding_move(&encoding);
-  options.encoding = mvd_enc;
-
-  z_timestamp_t ts;
-  z_timestamp_new(&ts, z_session_loan(&s));
-  options.timestamp = &ts;
-
-  ze_owned_serializer_t serializer;
-  ze_loaned_serializer_t *serializer_loan = ze_serializer_loan_mut(&serializer);
-
-  ze_serializer_empty(&serializer);
-  ze_serializer_serialize_str(serializer_loan, "sequence_number");
-  ze_serializer_serialize_int64(serializer_loan, sequence_number++);
-  ze_serializer_serialize_str(serializer_loan, "source_timestamp");
-  ze_serializer_serialize_int64(serializer_loan, millis());
-  ze_serializer_serialize_str(serializer_loan, "source_gid");
-  ze_serializer_serialize_buf(serializer_loan, s._rc._val->_local_zid.id, ZENOH_ID_SIZE);
-  ze_serializer_finish(ze_serializer_move(&serializer), &attachment);
-  options.attachment = z_bytes_move(&attachment);
-
-  Serial.print("Pub - ");
-  z_result_t res = z_publisher_put(z_publisher_loan(&pub), z_bytes_move(&payload), &options);
-  if (res != _Z_RES_OK) {
-    Serial.println("Error sending data. Result code: " + String(res));
-  } else {
-    Serial.println("Done");
-  }
-  delay(1000 / PUB_FREQ_HZ);
+void loop() {
+  handler_ptr->loop();
 }
