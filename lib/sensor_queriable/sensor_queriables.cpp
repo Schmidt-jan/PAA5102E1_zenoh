@@ -393,19 +393,19 @@ void q_setFrequency(z_loaned_query_t *query, void *arg)
 
 void Z_PAA5102E1_Handler::send_sensor_data()
 {
-    bool dxovf = false;
-    bool dyovf = false;
-    bool has_moved = false;
+    std::shared_ptr<bool> has_moved = std::make_shared<bool>(false);
+    std::shared_ptr<bool> dxovf = std::make_shared<bool>(false);
+    std::shared_ptr<bool> dyovf = std::make_shared<bool>(false);
+    sensor->readMotionStatusRegister(has_moved, dxovf, dyovf);
 
-    sensor->readMotionStatusRegister(&has_moved, &dxovf, &dyovf);
-
-    int16_t delta_x = 0;
-    int16_t delta_y = 0;
-    if (has_moved)
+    if (!*has_moved)
     {
-        delta_x = sensor->readDeltaX();
-        delta_y = sensor->readDeltaY();
+        return;
     }
+
+    int16_t delta_x = sensor->readDeltaX();
+    int16_t delta_y = sensor->readDeltaY();
+    
 
     if (dxovf)
     {
@@ -417,7 +417,7 @@ void Z_PAA5102E1_Handler::send_sensor_data()
         long_time_delta_y += 0xFFFF + delta_y;
     }
 
-    auto msg = DeltaMsg(delta_x, delta_y, dxovf, dyovf);
+    auto msg = DeltaMsg(delta_x, delta_y, *dxovf, *dyovf);
     auto buffer_size = msg.serialized_size();
     uint8_t buf[buffer_size] = {};
     msg.serialize(buf, buffer_size);
@@ -431,7 +431,7 @@ void Z_PAA5102E1_Handler::send_sensor_data()
     }
     else
     {
-        LOG_DEBUGF("Published data: %d, %d\n", delta_x, delta_y);
+        LOG_DEBUGF("Published data: %d, %d to %s", delta_x, delta_y, keyexpr_publisher.c_str());
     }
 }
 

@@ -1,22 +1,15 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <zenoh-pico.h>
-#include <paa5102e1Array.hpp>
+#include <paa5102e1.hpp>
 #include "secrets.h"
-#include "sensor_array_queriables.hpp"
-
-#define NUM_SENSORS 2
+#include "sensor_queriables.hpp"
 
 z_owned_publisher_t pub;
 z_owned_session_t session;
 z_publisher_put_options_t options;
-std::unique_ptr<PAA5102E1> sensor_ptr1;
-std::unique_ptr<Z_PAA5102E1_Handler> handler_ptr1;
-std::unique_ptr<PAA5102E1> sensor_ptr2;
-std::unique_ptr<Z_PAA5102E1_Handler> handler_ptr2;
-
-std::unique_ptr<PAA5102E1Array<NUM_SENSORS>> sensor_ptr;
-std::unique_ptr<Z_PAA5102E1_Array_Handler<NUM_SENSORS>> handler_ptr;
+std::unique_ptr<PAA5102E1> sensor_ptr;
+std::unique_ptr<Z_PAA5102E1_Handler> handler_ptr;
 
 z_owned_queryable_t q_reset, q_sleep, q_awake, q_isWriteProtected, q_isSleeping, q_isAwake,
     q_enableWriteProtection, q_disableWriteProtection, q_writeLaserDriveCurrent,
@@ -85,11 +78,6 @@ void init_zenoh()
   }
 }
 
- const PAA5102E1PinSetting pinSettings[NUM_SENSORS] = {
-    {GPIO_NUM_21, GPIO_NUM_22},
-    {GPIO_NUM_4, GPIO_NUM_0},
-  };
-
 void setup()
 {
   
@@ -98,10 +86,8 @@ void setup()
   init_zenoh();
   
   SPI.begin();
-
-  sensor_ptr = std::make_unique<PAA5102E1Array<NUM_SENSORS>>(SPISettings(1000000, MSBFIRST, SPI_MODE3), pinSettings);
-  Serial.print("Initializing sensor array...\t");
-  auto res = sensor_ptr->init(1);
+  sensor_ptr = std::make_unique<PAA5102E1>(SPISettings(1000000, MSBFIRST, SPI_MODE3), 5, 4);
+  auto res = sensor_ptr->init();
 
   if (res.hasError)
   {
@@ -112,7 +98,7 @@ void setup()
     }
   }
 
-  handler_ptr = std::make_unique<Z_PAA5102E1_Array_Handler<NUM_SENSORS>>(z_session_loan_mut(&session), "sensor", std::move(sensor_ptr));
+  handler_ptr = std::make_unique<Z_PAA5102E1_Handler>(z_session_loan_mut(&session), "sensor/1", std::move(sensor_ptr));
   handler_ptr->setup_queryables();
 }
 

@@ -35,22 +35,23 @@ private:
     void declare_queryable(const std::string& keyexpr_suf, void (*callback)(z_loaned_query_t *, void *), z_owned_queryable_t &queryable);
 
 public:
-    std::unique_ptr<PAA5102E1> sensor;
+    std::shared_ptr<PAA5102E1> sensor;
     bool sending_enabled = false;
     uint16_t send_freq_hz = DEFAULT_PUB_FREQ_HZ;
 
     Z_PAA5102E1_Handler(
         z_loaned_session_t *session,
         const std::string& name,
-        std::unique_ptr<PAA5102E1> sensor,
+        std::shared_ptr<PAA5102E1> sensor,
         std::string keyexpr_publisher)
-        : sending_enabled(false),
+        : sending_enabled(true),
           name(name),
           session(session),
           sensor(std::move(sensor)),
           send_freq_hz(DEFAULT_PUB_FREQ_HZ),
           long_time_delta_x(0),
-          long_time_delta_y(0)
+          long_time_delta_y(0),
+          keyexpr_publisher(keyexpr_publisher)
     {
         z_owned_config_t config;
         z_config_default(&config);
@@ -75,7 +76,7 @@ public:
     Z_PAA5102E1_Handler(
         z_loaned_session_t *session,
         const std::string& name,
-        std::unique_ptr<PAA5102E1> sensor)
+        std::shared_ptr<PAA5102E1> sensor)
     : Z_PAA5102E1_Handler(session, name, std::move(sensor), name + "/" + DEFAULT_PUB_TOPIC)
     {
     }
