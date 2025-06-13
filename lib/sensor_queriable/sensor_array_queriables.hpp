@@ -1,3 +1,4 @@
+/*
 #pragma once
 
 #include "sensor_queriables.hpp"
@@ -59,3 +60,4 @@ public:
         }
     }  
 };
+*/

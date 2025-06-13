@@ -1,121 +1,124 @@
 #include <Arduino.h>
-#include <WiFi.h>
 #include <zenoh-pico.h>
-#include <paa5102e1Array.hpp>
-#include "secrets.h"
-#include "sensor_array_queriables.hpp"
+#include <WiFi.h>
+#include <supported_boards.hpp>
 
-#define NUM_SENSORS 2
+#define MODE "client"
+#define LOCATOR ""
+#define ZENOH_CONFIG_CONNECT "serial/UART_1#baudrate=115200"
+#define ZENOH_CONFIG_LISTEN ""
+
+z_owned_session_t s;
+z_owned_subscriber_t sub;
 
 z_owned_publisher_t pub;
-z_owned_session_t session;
-z_publisher_put_options_t options;
-std::unique_ptr<PAA5102E1> sensor_ptr1;
-std::unique_ptr<Z_PAA5102E1_Handler> handler_ptr1;
-std::unique_ptr<PAA5102E1> sensor_ptr2;
-std::unique_ptr<Z_PAA5102E1_Handler> handler_ptr2;
+static int idx = 0;
 
-std::unique_ptr<PAA5102E1Array<NUM_SENSORS>> sensor_ptr;
-std::unique_ptr<Z_PAA5102E1_Array_Handler<NUM_SENSORS>> handler_ptr;
+#define KEYEXPR "demo/example/zenoh-pico-pub"
+#define VALUE "[ARDUINO]{ESP32} Publication from Zenoh-Pico!"
 
-z_owned_queryable_t q_reset, q_sleep, q_awake, q_isWriteProtected, q_isSleeping, q_isAwake,
-    q_enableWriteProtection, q_disableWriteProtection, q_writeLaserDriveCurrent,
-    q_readLaserDriveCurrent, q_readDeltaX, q_readDeltaY, q_readShutter,
-    q_readFrameAvg, q_readImageQuality, q_readResolutionX, q_readResolutionY,
-    q_writeResolutionX, q_writeResolutionY, q_start, q_stop, q_setFrequency;
+void setup() {
+  delay(1000);
+    //Serial.begin(115200);
+    while (!Serial) { delay(1000);}
+    Serial.println("Serial port initialized!");
+    Serial1.begin(115200);
+    while (!Serial1) { delay(1000);}
+    // Serial.println("Serial1 port initialized!");
+#ifndef Z_FEATURE_LINK_SERIAL
+    Serial.print("Connecting to WiFi...");
+    WiFi.mode(WIFI_STA);
+    WiFi.begin("jan-hotspot", "4F501554446AC7E3BF7ECF21A4");
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(1000);
+    }
+    Serial.println("OK");
+#endif
 
-void init_serial()
-{
-  Serial.begin(BAUD_RATE);
-  while (!Serial)
+    z_owned_config_t config;
+    z_config_default(&config);
+    zp_config_insert(z_config_loan_mut(&config), Z_CONFIG_MODE_KEY, MODE);
+
+#ifdef Z_FEATURE_LINK_SERIAL
+    if (strcmp(ZENOH_CONFIG_CONNECT, "") != 0) {
+      zp_config_insert(z_config_loan_mut(&config), Z_CONFIG_CONNECT_KEY, ZENOH_CONFIG_CONNECT);
+    }
+
+    if (strcmp(ZENOH_CONFIG_LISTEN, "") != 0) {
+      zp_config_insert(z_config_loan_mut(&config), Z_CONFIG_LISTEN_KEY, ZENOH_CONFIG_LISTEN);
+    }
+
+
+    
+    #else
+    if (strcmp(LOCATOR, "") != 0) {
+      if (strcmp(MODE, "client") == 0) {
+        zp_config_insert(z_config_loan_mut(&config), Z_CONFIG_CONNECT_KEY, LOCATOR);
+      } else {
+        zp_config_insert(z_config_loan_mut(&config), Z_CONFIG_LISTEN_KEY, LOCATOR);
+      }
+    }
+    #endif
+    Serial.print("Opening Zenoh session... ");
+    // Open Zenoh session
+  z_result_t res = z_open(&s, z_config_move(&config), NULL);
+  if (res < 0)
   {
-    delay(1000);
-  }
-  Serial.println("Serial initialized");
-}
-
-void init_wifi()
-{
-  Serial.print("Connecting to WiFi...\t");
-  Serial.print("SSID: ");
-  Serial.print(SSID_NAME);
-  Serial.print(" PW: ");
-  Serial.println(SSID_PW);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(SSID_NAME, SSID_PW);
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(1000);
-  }
-  Serial.println("OK");
-}
-
-void init_zenoh()
-{
-  // Initialize Zenoh Session and other parameters
-  z_owned_config_t config;
-  z_config_default(&config);
-  zp_config_insert(z_config_loan_mut(&config), Z_CONFIG_MODE_KEY, ZENOH_MODE);
-  if (strcmp(LOCATOR, "") != 0)
-  {
-    zp_config_insert(z_config_loan_mut(&config), Z_CONFIG_CONNECT_KEY, LOCATOR);
-  }
-
-  // Open Zenoh session
-  Serial.print("Opening Zenoh Session... \t");
-  if (z_open(&session, z_config_move(&config), NULL) < 0)
-  {
-    Serial.println("Unable to open session!");
+    Serial.print("Unable to open session! Code: ");
+    Serial.println(res);
     while (1)
     {
-      ;
+      delay(1000);
     }
   }
   Serial.println("OK");
 
   // Start read and lease tasks for zenoh-pico
-  if (zp_start_read_task(z_session_loan_mut(&session), NULL) < 0 || zp_start_lease_task(z_session_loan_mut(&session), NULL) < 0)
+  Serial.print("Starting read and lease tasks... ");
+  /*
+  if (zp_start_read_task(z_session_loan_mut(&s), NULL) < 0)
   {
-    Serial.println("Unable to start read and lease tasks\n");
-    z_session_drop(z_session_move(&session));
+    Serial.println("Unable to start read and lease tasks");
+    z_session_drop(z_session_move(&s));
     while (1)
     {
-      ;
+      delay(1000);
     }
-  }
-}
-
- const PAA5102E1PinSetting pinSettings[NUM_SENSORS] = {
-    {GPIO_NUM_21, GPIO_NUM_22},
-    {GPIO_NUM_4, GPIO_NUM_0},
-  };
-
-void setup()
-{
-  
-  init_serial();
-  init_wifi();
-  init_zenoh();
-  
-  SPI.begin();
-
-  sensor_ptr = std::make_unique<PAA5102E1Array<NUM_SENSORS>>(SPISettings(1000000, MSBFIRST, SPI_MODE3), pinSettings);
-  Serial.print("Initializing sensor array...\t");
-  auto res = sensor_ptr->init(1);
-
-  if (res.hasError)
-  {
-    Serial.printf("Failed to initialize sensor: %s\n", res.error.toString());
-    while (1)
-    {
-      ;
+  }*/
+    // Declare Zenoh publisher
+    Serial.print("Declaring publisher for ");
+    Serial.print(KEYEXPR);
+    Serial.println("...");
+    z_view_keyexpr_t ke;
+    z_view_keyexpr_from_str_unchecked(&ke, KEYEXPR);
+    if (z_declare_publisher(z_session_loan(&s), &pub, z_view_keyexpr_loan(&ke), NULL) < 0) {
+        Serial.println("Unable to declare publisher for key expression!");
+        while (1) {
+            ;
+        }
     }
-  }
+    Serial.println("OK");
+    Serial.println("Zenoh setup finished!");
 
-  handler_ptr = std::make_unique<Z_PAA5102E1_Array_Handler<NUM_SENSORS>>(z_session_loan_mut(&session), "sensor", std::move(sensor_ptr));
-  handler_ptr->setup_queryables();
+    delay(300);
 }
 
 void loop() {
-  handler_ptr->loop();
+    delay(1000);
+    char buf[256];
+    sprintf(buf, "[%4d] %s", idx++, VALUE);
+
+    Serial.print("Writing Data ('");
+    Serial.print(KEYEXPR);
+    Serial.print("': '");
+    Serial.print(buf);
+    Serial.println("')");
+
+    // Create payload
+    z_owned_bytes_t payload;
+    z_bytes_copy_from_str(&payload, buf);
+
+    if (z_publisher_put(z_publisher_loan(&pub), z_bytes_move(&payload), NULL) < 0) {
+        Serial.println("Error while publishing data");
+    }
 }

@@ -1,3 +1,4 @@
+/*
 #include "sensor_queriables.hpp"
 
 #if LOG_LEVEL <= LOG_LEVEL_INFO
@@ -503,3 +504,4 @@ void Z_PAA5102E1_Handler::loop()
         last_send = now;
     }
 }
+*/
