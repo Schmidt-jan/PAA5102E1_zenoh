@@ -5,7 +5,7 @@
 
 #define MODE "client"
 #define LOCATOR ""
-#define ZENOH_CONFIG_CONNECT "serial/UART_1#baudrate=115200"
+#define ZENOH_CONFIG_CONNECT "serial/UART_2#baudrate=115200"
 #define ZENOH_CONFIG_LISTEN ""
 
 z_owned_session_t s;
@@ -19,11 +19,11 @@ static int idx = 0;
 
 void setup() {
   delay(1000);
-    //Serial.begin(115200);
+    Serial.begin(115200);
     while (!Serial) { delay(1000);}
     Serial.println("Serial port initialized!");
-    Serial1.begin(115200);
-    while (!Serial1) { delay(1000);}
+    // Serial1.begin(115200);
+    // while (!Serial1) { delay(1000);}
     // Serial.println("Serial1 port initialized!");
 #ifndef Z_FEATURE_LINK_SERIAL
     Serial.print("Connecting to WiFi...");
@@ -48,9 +48,7 @@ void setup() {
       zp_config_insert(z_config_loan_mut(&config), Z_CONFIG_LISTEN_KEY, ZENOH_CONFIG_LISTEN);
     }
 
-
-    
-    #else
+#else
     if (strcmp(LOCATOR, "") != 0) {
       if (strcmp(MODE, "client") == 0) {
         zp_config_insert(z_config_loan_mut(&config), Z_CONFIG_CONNECT_KEY, LOCATOR);
@@ -58,8 +56,9 @@ void setup() {
         zp_config_insert(z_config_loan_mut(&config), Z_CONFIG_LISTEN_KEY, LOCATOR);
       }
     }
-    #endif
+#endif
     Serial.print("Opening Zenoh session... ");
+
     // Open Zenoh session
   z_result_t res = z_open(&s, z_config_move(&config), NULL);
   if (res < 0)
@@ -72,6 +71,18 @@ void setup() {
     }
   }
   Serial.println("OK");
+
+#if Z_FEATURE_MULTI_THREAD == 1
+
+    if (zp_start_read_task(z_session_loan_mut(&s), NULL) < 0 || zp_start_lease_task(z_session_loan_mut(&s), NULL) < 0) {
+        Serial.println("Unable to start read and lease tasks\n");
+        z_session_drop(z_session_move(&s));
+        while (1) {
+            ;
+        }
+    }
+    Serial.println("Zenoh setup finished!");
+#endif
 
   // Start read and lease tasks for zenoh-pico
   Serial.print("Starting read and lease tasks... ");
