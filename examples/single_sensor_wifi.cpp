@@ -1,3 +1,17 @@
+/**
+ * @file single_sensor_wifi.cpp 
+ * @author Jan Schmidt
+ * @brief 
+ * @version 0.1
+ * @date 2025-06-23
+ * 
+ * @copyright Copyright (c) 2025
+ * 
+ * This example demonstrates how to use a single PAA5102E1 sensor with Zenoh over WiFi.
+ * It initializes the sensor, sets up Zenoh for communication, and handles queryables for sensor
+ * operations such as reading and writing sensor data.
+ */
+
 #include <Arduino.h>
 #include <WiFi.h>
 #include <zenoh-pico.h>

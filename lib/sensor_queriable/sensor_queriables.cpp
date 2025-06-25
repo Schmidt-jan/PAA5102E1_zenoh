@@ -1,24 +1,68 @@
-/*
+
 #include "sensor_queriables.hpp"
 
-#if LOG_LEVEL <= LOG_LEVEL_INFO
+#if LOG_LEVEL <= LOG_LEVEL_DEBUG
 void log_req(z_loaned_query_t *query)
 {
+    auto payload = z_query_payload(query);
+    auto payload_led = z_bytes_len(payload);
+    auto it = z_bytes_get_slice_iterator(payload);
+    z_view_slice_t v;
+    while (z_bytes_slice_iterator_next(&it, &v))
+    {
+        const uint8_t *slice_data = z_slice_data(z_view_slice_loan(&v));
+        size_t slice_len = z_slice_len(z_view_slice_loan(&v));
+        Serial.printf("Slice data: %u, length: %zu\n", *slice_data, slice_len);
+    }
+
+    /*
+    Serial.println("Now encoding");
+    
+    auto encoding = z_query_encoding(query);
+    Serial.printf("Encoding schema: '%u', value: ''\n", encoding->id, z_string_data(&encoding->schema));
+
+    z_view_string_t parameter_str;
+    z_query_parameters(query, &parameter_str);
+    Serial.printf("Parameters: '%s'\n",
+                  z_string_data(z_view_string_loan(&parameter_str)));
+    auto attachment = z_query_attachment(query);
+    if (attachment)
+    {
+        z_owned_string_t attachment_str;
+        z_bytes_to_string(attachment, &attachment_str);
+        Serial.printf("Attachment: '%s'\n", z_string_data(z_string_loan(&attachment_str)));
+        z_string_drop(z_string_move(&attachment_str));
+    }
+    else
+    {
+        Serial.println("No attachment");
+    }
+*/
+    /*
     z_view_string_t keystr;
     z_keyexpr_as_view_string(z_query_keyexpr(query), &keystr);
+    size_t len = query->_val->_value.payload._slices._len;
     const z_loaned_string_t *loaned_str = z_view_string_loan(&keystr);
     LOG_INFOF("Received query: %s", z_string_data(loaned_str));
-    size_t len = query->_val->_value.payload._slices._len;
-    LOG_INFOF("\tPayload length: %zu", len);
     const void *data = query->_val->_value.payload._slices._val;
-    std::string payload_str = "";
+    if (data == NULL)
+    {
+        LOG_INFO("No payload data");
+        return;
+    }
+    // Print payload data
+    Serial.print("Payload data: [");
     for (size_t i = 0; i < len; ++i)
     {
-        payload_str += std::to_string(reinterpret_cast<const uint8_t *>(data)[i]);
-        if (i < len - 1)
-            payload_str += ", ";
+        uint8_t byte = ((uint8_t *)data)[i];
+        Serial.print(byte);
+        if (i < len - 1) {
+            Serial.print(", ");
+        }
     }
-    LOG_INFOF("\tPayload data: [%s]", payload_str.c_str());
+    Serial.println("]");
+    */
+    // LOG_INFOF("\tPayload data: [%s]", payload_str.c_str());
 }
 #define LOG_REQ(query)  \
     do                  \
@@ -32,7 +76,7 @@ void log_req(z_loaned_query_t *query)
     } while (0)
 #endif
 
-#if LOG_LEVEL <= LOG_LEVEL_INFO
+#if LOG_LEVEL <= LOG_LEVEL_DEBUG
 void log_reply(z_loaned_query_t *query, uint8_t *payload, size_t len)
 {
     z_view_string_t keystr;
@@ -41,8 +85,10 @@ void log_reply(z_loaned_query_t *query, uint8_t *payload, size_t len)
     LOG_INFOF("Reply to query: %s", z_string_data(loaned_str));
     LOG_INFOF("\tPayload length: %zu", len);
     std::string payload_str = "";
+
     for (size_t i = 0; i < len; ++i)
     {
+        Serial.println(payload[i]);
         payload_str += std::to_string(payload[i]);
         if (i < len - 1)
             payload_str += ", ";
@@ -60,6 +106,26 @@ void log_reply(z_loaned_query_t *query, uint8_t *payload, size_t len)
     {                                  \
     } while (0)
 #endif
+
+uint8_t * query_payload_to_bytes(const z_loaned_query_t *query, size_t *len)
+{
+    const z_loaned_bytes_t *payload = z_query_payload(query);
+    auto payload_len = z_bytes_len(payload);
+     uint8_t *data_out = (uint8_t *)malloc(payload_len);
+    auto it = z_bytes_get_slice_iterator(payload);
+    z_view_slice_t v;
+    size_t pos = 0;
+    while (z_bytes_slice_iterator_next(&it, &v)) {
+        const uint8_t *slice_data = z_slice_data(z_view_slice_loan(&v));
+        size_t slice_len = z_slice_len(z_view_slice_loan(&v));
+        memcpy(data_out + pos, slice_data, slice_len);
+        pos += slice_len;
+    }
+    if (len) {
+        *len = payload_len;
+    }
+    return data_out;
+}
 
 void send_query_reply(z_loaned_query_t *query, uint8_t *payload, size_t len)
 {
@@ -179,10 +245,10 @@ void q_writeLaserDriveCurrent(z_loaned_query_t *query, void *arg)
 {
     LOG_REQ(query);
     Z_PAA5102E1_Handler *handler = static_cast<Z_PAA5102E1_Handler *>(arg);
-    const z_loaned_bytes_t *payload = z_query_payload(query);
-    auto buf_size = payload->_slices._len;
-    uint8_t buf[buf_size] = {};
+    size_t buf_size = 0;
+    auto buf = query_payload_to_bytes(query, &buf_size);
     auto req = ByteMsg::deserialize(buf, buf_size);
+    free(buf);
 
     handler->sensor->writeLaserDriveCurrent(req->value);
 
@@ -406,7 +472,6 @@ void Z_PAA5102E1_Handler::send_sensor_data()
 
     int16_t delta_x = sensor->readDeltaX();
     int16_t delta_y = sensor->readDeltaY();
-    
 
     if (dxovf)
     {
@@ -504,4 +569,3 @@ void Z_PAA5102E1_Handler::loop()
         last_send = now;
     }
 }
-*/

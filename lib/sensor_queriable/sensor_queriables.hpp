@@ -1,4 +1,3 @@
-/*
 #pragma once
 
 #include <zenoh-pico.h>
@@ -86,4 +85,3 @@ public:
 
     void loop();
 };
-*/

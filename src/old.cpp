@@ -88,9 +88,14 @@ void init_zenoh()
   }
 }
 
+
  const PAA5102E1PinSetting pinSettings[NUM_SENSORS] = {
-    {GPIO_NUM_21, GPIO_NUM_22},
-    {GPIO_NUM_4, GPIO_NUM_0},
+    // Example pin settings for two sensors
+    // {GPIO_NUM_21, GPIO_NUM_22},
+    // {GPIO_NUM_4, GPIO_NUM_0},
+
+    // ESP32 with shield
+    {GPIO_NUM_5, GPIO_NUM_4},  // SS pin, LDP_ENL pin
   };
 
 void setup()

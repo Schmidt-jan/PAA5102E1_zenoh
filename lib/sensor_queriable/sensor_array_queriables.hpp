@@ -1,4 +1,3 @@
-/*
 #pragma once
 
 #include "sensor_queriables.hpp"
@@ -33,7 +32,7 @@ public:
                 session,
                 name + "/" + std::to_string(i),
                 res.value,
-                keyexpr_publisher + "/" + std::to_string(i));
+                name + "/" + std::to_string(i) + "/" +  keyexpr_publisher);
         }
     }
 
@@ -41,8 +40,8 @@ public:
     z_loaned_session_t *session,
     const std::string& name,
     std::unique_ptr<PAA5102E1Array<N>> sensors_ptr)
-    : Z_PAA5102E1_Array_Handler(session, name, std::move(sensors_ptr), name + "/" + DEFAULT_PUB_TOPIC)
-{}
+    : Z_PAA5102E1_Array_Handler(session, name, std::move(sensors_ptr), DEFAULT_PUB_TOPIC)
+    {}
     
     void setup_queryables()
     {
@@ -60,4 +59,3 @@ public:
         }
     }  
 };
-*/

@@ -1,5 +1,5 @@
 /**
- * @file single_sensor_wifi.cpp 
+ * @file sensor_array_wifi.cpp
  * @author Jan Schmidt
  * @brief 
  * @version 0.1
@@ -7,23 +7,30 @@
  * 
  * @copyright Copyright (c) 2025
  * 
- * This example demonstrates how to use a single PAA5102E1 sensor with Zenoh over WiFi.
- * It initializes the sensor, sets up Zenoh for communication, and handles queryables for sensor
+ * This example demonstrates how to use the PAA5102E1 sensor array with Zenoh over WiFi.
+ * It initializes the sensors, sets up Zenoh for communication, and handles queryables for sensor
  * operations such as reading and writing sensor data.
  */
 
 #include <Arduino.h>
 #include <WiFi.h>
 #include <zenoh-pico.h>
-#include <paa5102e1.hpp>
+#include <paa5102e1Array.hpp>
 #include "secrets.h"
-#include "sensor_queriables.hpp"
+#include "sensor_array_queriables.hpp"
+
+#define NUM_SENSORS 2
 
 z_owned_publisher_t pub;
 z_owned_session_t session;
 z_publisher_put_options_t options;
-std::unique_ptr<PAA5102E1> sensor_ptr;
-std::unique_ptr<Z_PAA5102E1_Handler> handler_ptr;
+std::unique_ptr<PAA5102E1> sensor_ptr1;
+std::unique_ptr<Z_PAA5102E1_Handler> handler_ptr1;
+std::unique_ptr<PAA5102E1> sensor_ptr2;
+std::unique_ptr<Z_PAA5102E1_Handler> handler_ptr2;
+
+std::unique_ptr<PAA5102E1Array<NUM_SENSORS>> sensor_ptr;
+std::unique_ptr<Z_PAA5102E1_Array_Handler<NUM_SENSORS>> handler_ptr;
 
 z_owned_queryable_t q_reset, q_sleep, q_awake, q_isWriteProtected, q_isSleeping, q_isAwake,
     q_enableWriteProtection, q_disableWriteProtection, q_writeLaserDriveCurrent,
@@ -67,12 +74,15 @@ void init_zenoh()
   {
     zp_config_insert(z_config_loan_mut(&config), Z_CONFIG_CONNECT_KEY, LOCATOR);
   }
+  zp_config_insert(z_config_loan_mut(&config), Z_CONFIG_LISTEN_KEY, "serial/UART_1#baudrate=115200");
+  // zp_config_insert(z_config_loan_mut(&config), Z_CONFIG_LISTEN_KEY, "listen");
 
   // Open Zenoh session
   Serial.print("Opening Zenoh Session... \t");
-  if (z_open(&session, z_config_move(&config), NULL) < 0)
+  auto res = z_open(&session, z_config_move(&config), NULL);
+  if (res < 0)
   {
-    Serial.println("Unable to open session!");
+    Serial.printf("Unable to open session! Error code: %d\n", res);
     while (1)
     {
       ;
@@ -92,30 +102,39 @@ void init_zenoh()
   }
 }
 
+
+ const PAA5102E1PinSetting pinSettings[NUM_SENSORS] = {
+    // Example pin settings for two sensors
+    // {GPIO_NUM_21, GPIO_NUM_22},
+    // {GPIO_NUM_4, GPIO_NUM_0},
+
+    // ESP32 with shield
+    {GPIO_NUM_5, GPIO_NUM_4},  // SS pin, LDP_ENL pin
+  };
+
 void setup()
 {
-  
+  delay(1000);
   init_serial();
-  init_wifi();
+  //init_wifi();
   init_zenoh();
   
   SPI.begin();
-  sensor_ptr = std::make_unique<PAA5102E1>(SPISettings(1000000, MSBFIRST, SPI_MODE3), 5, 4);
-  auto res = sensor_ptr->init();
+
+  sensor_ptr = std::make_unique<PAA5102E1Array<NUM_SENSORS>>(SPISettings(1000000, MSBFIRST, SPI_MODE3), pinSettings);
+  Serial.print("Initializing sensor array...\t");
+  auto res = sensor_ptr->init(1);
 
   if (res.hasError)
   {
-    Serial.printf("Failed to initialize sensor: \n%s\n", res.error.toString().c_str());
+    Serial.printf("Failed to initialize sensor: %s\n", res.error.toString());
     while (1)
     {
       ;
     }
   }
 
-
-  Serial.println("Sensor initialized successfully");
-
-  handler_ptr = std::make_unique<Z_PAA5102E1_Handler>(z_session_loan_mut(&session), "sensor/1", std::move(sensor_ptr));
+  handler_ptr = std::make_unique<Z_PAA5102E1_Array_Handler<NUM_SENSORS>>(z_session_loan_mut(&session), "sensor", std::move(sensor_ptr));
   handler_ptr->setup_queryables();
 }
 
