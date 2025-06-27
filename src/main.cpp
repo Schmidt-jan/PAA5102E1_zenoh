@@ -18,6 +18,7 @@
 #include <paa5102e1.hpp>
 #include "secrets.h"
 #include "sensor_queriables.hpp"
+#define ZENOH_MAX_SESSION_OPEN_TRIALS 10
 
 z_owned_publisher_t pub;
 z_owned_session_t session;
@@ -69,16 +70,26 @@ void init_zenoh()
   }
 
   // Open Zenoh session
-  Serial.print("Opening Zenoh Session... \t");
-  if (z_open(&session, z_config_move(&config), NULL) < 0)
+  uint8_t session_open_trial = 1;
+  Serial.println("Opening zenoh session");
+  Serial.printf("Trial %d/%d...\n", session_open_trial, ZENOH_MAX_SESSION_OPEN_TRIALS);
+  while (z_open(&session, z_config_move(&config), NULL) < 0 && session_open_trial <= ZENOH_MAX_SESSION_OPEN_TRIALS)
   {
-    Serial.println("Unable to open session!");
+    session_open_trial++;
+    Serial.print("Failed! Retrying...\n");
+    delay(1000);
+    Serial.printf("Trial %d/%d\n", session_open_trial, ZENOH_MAX_SESSION_OPEN_TRIALS);
+  }
+
+  if (session_open_trial > ZENOH_MAX_SESSION_OPEN_TRIALS)
+  {
+    Serial.println("Failed to open zenoh session after maximum trials!");
     while (1)
     {
-      ;
+      delay(1000);
     }
   }
-  Serial.println("OK");
+  Serial.println("Session opened successfully");
 
   // Start read and lease tasks for zenoh-pico
   if (zp_start_read_task(z_session_loan_mut(&session), NULL) < 0 || zp_start_lease_task(z_session_loan_mut(&session), NULL) < 0)

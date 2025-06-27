@@ -14,55 +14,6 @@ void log_req(z_loaned_query_t *query)
         size_t slice_len = z_slice_len(z_view_slice_loan(&v));
         Serial.printf("Slice data: %u, length: %zu\n", *slice_data, slice_len);
     }
-
-    /*
-    Serial.println("Now encoding");
-    
-    auto encoding = z_query_encoding(query);
-    Serial.printf("Encoding schema: '%u', value: ''\n", encoding->id, z_string_data(&encoding->schema));
-
-    z_view_string_t parameter_str;
-    z_query_parameters(query, &parameter_str);
-    Serial.printf("Parameters: '%s'\n",
-                  z_string_data(z_view_string_loan(&parameter_str)));
-    auto attachment = z_query_attachment(query);
-    if (attachment)
-    {
-        z_owned_string_t attachment_str;
-        z_bytes_to_string(attachment, &attachment_str);
-        Serial.printf("Attachment: '%s'\n", z_string_data(z_string_loan(&attachment_str)));
-        z_string_drop(z_string_move(&attachment_str));
-    }
-    else
-    {
-        Serial.println("No attachment");
-    }
-*/
-    /*
-    z_view_string_t keystr;
-    z_keyexpr_as_view_string(z_query_keyexpr(query), &keystr);
-    size_t len = query->_val->_value.payload._slices._len;
-    const z_loaned_string_t *loaned_str = z_view_string_loan(&keystr);
-    LOG_INFOF("Received query: %s", z_string_data(loaned_str));
-    const void *data = query->_val->_value.payload._slices._val;
-    if (data == NULL)
-    {
-        LOG_INFO("No payload data");
-        return;
-    }
-    // Print payload data
-    Serial.print("Payload data: [");
-    for (size_t i = 0; i < len; ++i)
-    {
-        uint8_t byte = ((uint8_t *)data)[i];
-        Serial.print(byte);
-        if (i < len - 1) {
-            Serial.print(", ");
-        }
-    }
-    Serial.println("]");
-    */
-    // LOG_INFOF("\tPayload data: [%s]", payload_str.c_str());
 }
 #define LOG_REQ(query)  \
     do                  \
@@ -88,7 +39,6 @@ void log_reply(z_loaned_query_t *query, uint8_t *payload, size_t len)
 
     for (size_t i = 0; i < len; ++i)
     {
-        Serial.println(payload[i]);
         payload_str += std::to_string(payload[i]);
         if (i < len - 1)
             payload_str += ", ";
@@ -299,6 +249,32 @@ void q_readDeltaY(z_loaned_query_t *query, void *arg)
     send_query_reply(query, rep_buf, buffer_size);
 }
 
+void q_readAbsDeltaX(z_loaned_query_t *query, void *arg)
+{
+    LOG_REQ(query);
+    Z_PAA5102E1_Handler *handler = static_cast<Z_PAA5102E1_Handler *>(arg);
+    auto res = handler->sensor->getAbsoluteDeltaX();
+
+    auto rep = Int32Msg(res);
+    auto buffer_size = rep.serialized_size();
+    uint8_t rep_buf[buffer_size] = {};
+    rep.serialize(rep_buf, buffer_size);
+    send_query_reply(query, rep_buf, buffer_size);
+}
+
+void q_readAbsDeltaY(z_loaned_query_t *query, void *arg)
+{
+    LOG_REQ(query);
+    Z_PAA5102E1_Handler *handler = static_cast<Z_PAA5102E1_Handler *>(arg);
+    auto res = handler->sensor->getAbsoluteDeltaY();
+
+    auto rep = Int32Msg(res);
+    auto buffer_size = rep.serialized_size();
+    uint8_t rep_buf[buffer_size] = {};
+    rep.serialize(rep_buf, buffer_size);
+    send_query_reply(query, rep_buf, buffer_size);
+}
+
 void q_readShutter(z_loaned_query_t *query, void *arg)
 {
     LOG_REQ(query);
@@ -369,12 +345,13 @@ void q_writeResolutionX(z_loaned_query_t *query, void *arg)
     LOG_REQ(query);
     Z_PAA5102E1_Handler *handler = static_cast<Z_PAA5102E1_Handler *>(arg);
     const z_loaned_bytes_t *payload = z_query_payload(query);
-    auto buf_size = payload->_slices._len;
-    uint8_t buf[buf_size] = {};
+    size_t buf_size = 0;
+    auto buf = query_payload_to_bytes(query, &buf_size);
     auto req = ByteMsg::deserialize(buf, buf_size);
-
+    free(buf);
+    
     handler->sensor->writeResolutionX(req->value);
-
+    
     auto rep = EmptyMsg();
     auto buffer_size = rep.serialized_size();
     uint8_t rep_buf[buffer_size] = {};
@@ -388,9 +365,10 @@ void q_writeResolutionY(z_loaned_query_t *query, void *arg)
     LOG_REQ(query);
     Z_PAA5102E1_Handler *handler = static_cast<Z_PAA5102E1_Handler *>(arg);
     const z_loaned_bytes_t *payload = z_query_payload(query);
-    auto buf_size = payload->_slices._len;
-    uint8_t buf[buf_size] = {};
+    size_t buf_size = 0;
+    auto buf = query_payload_to_bytes(query, &buf_size);
     auto req = ByteMsg::deserialize(buf, buf_size);
+    free(buf);
 
     handler->sensor->writeResolutionY(req->value);
 
@@ -533,6 +511,8 @@ void Z_PAA5102E1_Handler::setup_queryables()
     declare_queryable("read/LaserDriveCurrent", q_readLaserDriveCurrent, qable_readLaserDriveCurrent);
     declare_queryable("read/DeltaX", q_readDeltaX, qable_readDeltaX);
     declare_queryable("read/DeltaY", q_readDeltaY, qable_readDeltaY);
+    declare_queryable("read/AbsDeltaX", q_readAbsDeltaX, qable_readAbsDeltaX);
+    declare_queryable("read/AbsDeltaY", q_readAbsDeltaY, qable_readAbsDeltaY);
     declare_queryable("read/Shutter", q_readShutter, qable_readShutter);
     declare_queryable("read/FrameAvg", q_readFrameAvg, qable_readFrameAvg);
     declare_queryable("read/ImageQuality", q_readImageQuality, qable_readImageQuality);

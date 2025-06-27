@@ -6,6 +6,7 @@
 #include <std_msg/Bool.hpp>
 #include <std_msg/Byte.hpp>
 #include <std_msg/UInt16.hpp>
+#include <std_msg/Int32.hpp>
 #include <std_msg/Empty.hpp>
 #include <paa5102e1.hpp>
 #include <memory>
@@ -26,7 +27,7 @@ private:
 
     z_owned_queryable_t qable_reset, qable_sleep, qable_awake, qable_isWriteProtected,
         qable_isSleeping, qable_isAwake, qable_enableWriteProtection, qable_disableWriteProtection,
-        qable_writeLaserDriveCurrent, qable_readLaserDriveCurrent, qable_readDeltaX, qable_readDeltaY,
+        qable_writeLaserDriveCurrent, qable_readLaserDriveCurrent, qable_readDeltaX, qable_readDeltaY, qable_readAbsDeltaX, qable_readAbsDeltaY,
         qable_readShutter, qable_readFrameAvg, qable_readImageQuality, qable_readResolutionX,
         qable_readResolutionY, qable_writeResolutionX, qable_writeResolutionY, qable_start, qable_stop, qable_setFrequency;
 
