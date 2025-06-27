@@ -25,11 +25,17 @@ private:
     int64_t long_time_delta_x = 0;
     int64_t long_time_delta_y = 0;
 
-    z_owned_queryable_t qable_reset, qable_sleep, qable_awake, qable_isWriteProtected,
-        qable_isSleeping, qable_isAwake, qable_enableWriteProtection, qable_disableWriteProtection,
-        qable_writeLaserDriveCurrent, qable_readLaserDriveCurrent, qable_readDeltaX, qable_readDeltaY, qable_readAbsDeltaX, qable_readAbsDeltaY,
-        qable_readShutter, qable_readFrameAvg, qable_readImageQuality, qable_readResolutionX,
-        qable_readResolutionY, qable_writeResolutionX, qable_writeResolutionY, qable_start, qable_stop, qable_setFrequency;
+    z_owned_queryable_t 
+        qable_reset, 
+        qable_sleep, qable_awake, qable_isSleeping, qable_isAwake,
+        qable_isWriteProtected, qable_enableWriteProtection, qable_disableWriteProtection,
+        qable_readLaserDriveCurrent, qable_writeLaserDriveCurrent, 
+        qable_readShutter, qable_readFrameAvg, qable_readImageQuality, 
+        qable_readResolutionX, qable_readResolutionY, qable_writeResolutionX, qable_writeResolutionY, 
+        qable_readDeltaX, qable_readDeltaY, 
+        qable_readAbsDeltaX, qable_readAbsDeltaY, qable_resetAbsDelta,
+        qable_lightSourceLED, qable_lightSourceLaser,
+        qable_publisherStart, qable_publisherStop, qable_publisherFrequency;
 
     void send_sensor_data();
 

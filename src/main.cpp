@@ -30,7 +30,7 @@ z_owned_queryable_t q_reset, q_sleep, q_awake, q_isWriteProtected, q_isSleeping,
     q_enableWriteProtection, q_disableWriteProtection, q_writeLaserDriveCurrent,
     q_readLaserDriveCurrent, q_readDeltaX, q_readDeltaY, q_readShutter,
     q_readFrameAvg, q_readImageQuality, q_readResolutionX, q_readResolutionY,
-    q_writeResolutionX, q_writeResolutionY, q_start, q_stop, q_setFrequency;
+    q_writeResolutionX, q_writeResolutionY, q_publisherStart, q_publisherStop, q_publisherFrequency;
 
 void init_serial()
 {

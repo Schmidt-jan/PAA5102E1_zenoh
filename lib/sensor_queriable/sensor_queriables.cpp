@@ -275,6 +275,19 @@ void q_readAbsDeltaY(z_loaned_query_t *query, void *arg)
     send_query_reply(query, rep_buf, buffer_size);
 }
 
+void q_resetAbsDelta(z_loaned_query_t *query, void *arg)
+{
+    LOG_REQ(query);
+    Z_PAA5102E1_Handler *handler = static_cast<Z_PAA5102E1_Handler *>(arg);
+    handler->sensor->resetAbsDelta();
+
+    auto msg = EmptyMsg();
+    auto buffer_size = msg.serialized_size();
+    uint8_t buf[buffer_size] = {};
+    msg.serialize(buf, buffer_size);
+    send_query_reply(query, buf, buffer_size);
+}
+
 void q_readShutter(z_loaned_query_t *query, void *arg)
 {
     LOG_REQ(query);
@@ -378,6 +391,32 @@ void q_writeResolutionY(z_loaned_query_t *query, void *arg)
     rep.serialize(rep_buf, buffer_size);
     send_query_reply(query, rep_buf, buffer_size);
     delete req;
+}
+
+void q_lightSourceLED(z_loaned_query_t *query, void *arg)
+{
+    LOG_REQ(query);
+    Z_PAA5102E1_Handler *handler = static_cast<Z_PAA5102E1_Handler *>(arg);
+    handler->sensor->setLightSource(Light_Source::LED);
+
+    auto msg = EmptyMsg();
+    auto buffer_size = msg.serialized_size();
+    uint8_t buf[buffer_size] = {};
+    msg.serialize(buf, buffer_size);
+    send_query_reply(query, buf, buffer_size);
+}
+
+void q_lightSourceLaser(z_loaned_query_t *query, void *arg)
+{
+    LOG_REQ(query);
+    Z_PAA5102E1_Handler *handler = static_cast<Z_PAA5102E1_Handler *>(arg);
+    handler->sensor->setLightSource(Light_Source::LASER);
+
+    auto msg = EmptyMsg();
+    auto buffer_size = msg.serialized_size();
+    uint8_t buf[buffer_size] = {};
+    msg.serialize(buf, buffer_size);
+    send_query_reply(query, buf, buffer_size);
 }
 
 // --- Start / Stop / Set Frequency ---
@@ -499,33 +538,40 @@ void Z_PAA5102E1_Handler::declare_queryable(const std::string &keyexpr_suf, void
 
 void Z_PAA5102E1_Handler::setup_queryables()
 {
-    declare_queryable("system/reset", q_reset, qable_reset);
-    declare_queryable("system/sleep", q_sleep, qable_sleep);
-    declare_queryable("system/awake", q_awake, qable_awake);
-    declare_queryable("system/isWriteProtected", q_isWriteProtected, qable_isWriteProtected);
-    declare_queryable("system/isSleeping", q_isSleeping, qable_isSleeping);
-    declare_queryable("system/isAwake", q_isAwake, qable_isAwake);
-    declare_queryable("system/enableWriteProtection", q_enableWriteProtection, qable_enableWriteProtection);
-    declare_queryable("system/disableWriteProtection", q_disableWriteProtection, qable_disableWriteProtection);
 
-    declare_queryable("read/LaserDriveCurrent", q_readLaserDriveCurrent, qable_readLaserDriveCurrent);
-    declare_queryable("read/DeltaX", q_readDeltaX, qable_readDeltaX);
-    declare_queryable("read/DeltaY", q_readDeltaY, qable_readDeltaY);
-    declare_queryable("read/AbsDeltaX", q_readAbsDeltaX, qable_readAbsDeltaX);
-    declare_queryable("read/AbsDeltaY", q_readAbsDeltaY, qable_readAbsDeltaY);
-    declare_queryable("read/Shutter", q_readShutter, qable_readShutter);
-    declare_queryable("read/FrameAvg", q_readFrameAvg, qable_readFrameAvg);
-    declare_queryable("read/ImageQuality", q_readImageQuality, qable_readImageQuality);
-    declare_queryable("read/ResolutionX", q_readResolutionX, qable_readResolutionX);
-    declare_queryable("read/ResolutionY", q_readResolutionY, qable_readResolutionY);
+    declare_queryable("System/Read/IsWriteProtected", q_isWriteProtected, qable_isWriteProtected);
+    declare_queryable("System/Read/IsSleeping", q_isSleeping, qable_isSleeping);
+    declare_queryable("System/Read/IsAwake", q_isAwake, qable_isAwake);
+    declare_queryable("System/Read/Reset", q_reset, qable_reset);
+    declare_queryable("System/Read/SleepMode/Sleep", q_sleep, qable_sleep);
+    declare_queryable("System/Read/SleepMode/Awake", q_awake, qable_awake);
+    declare_queryable("System/Read/WriteProtection/On", q_enableWriteProtection, qable_enableWriteProtection);
+    declare_queryable("System/Read/WriteProtection/Off", q_disableWriteProtection, qable_disableWriteProtection);
 
-    declare_queryable("write/LaserDriveCurrent", q_writeLaserDriveCurrent, qable_writeLaserDriveCurrent);
-    declare_queryable("write/ResolutionX", q_writeResolutionX, qable_writeResolutionX);
-    declare_queryable("write/ResolutionY", q_writeResolutionY, qable_writeResolutionY);
+    
+    declare_queryable("Translation/Read/DeltaX", q_readDeltaX, qable_readDeltaX);
+    declare_queryable("Translation/Read/DeltaY", q_readDeltaY, qable_readDeltaY);
+    declare_queryable("Translation/Read/AbsDeltaX", q_readAbsDeltaX, qable_readAbsDeltaX);
+    declare_queryable("Translation/Read/AbsDeltaY", q_readAbsDeltaY, qable_readAbsDeltaY);
 
-    declare_queryable("publisher/start", q_start, qable_start);
-    declare_queryable("publisher/stop", q_stop, qable_stop);
-    declare_queryable("publisher/setFrequency", q_setFrequency, qable_setFrequency);
+    declare_queryable("Translation/Read/ResetAbsDelta", q_resetAbsDelta, qable_resetAbsDelta);
+    
+    declare_queryable("Sensor/Read/LightSource/LED", q_lightSourceLED, qable_lightSourceLED);
+    declare_queryable("Sensor/Read/LightSource/Laser", q_lightSourceLaser, qable_lightSourceLaser);
+    declare_queryable("Sensor/Read/ResolutionX", q_readResolutionX, qable_readResolutionX);
+    declare_queryable("Sensor/Read/ResolutionY", q_readResolutionY, qable_readResolutionY);
+    declare_queryable("Sensor/Read/LaserDriveCurrent", q_readLaserDriveCurrent, qable_readLaserDriveCurrent);
+    declare_queryable("Sensor/Read/FrameAvg", q_readFrameAvg, qable_readFrameAvg);
+    declare_queryable("Sensor/Read/Shutter", q_readShutter, qable_readShutter);
+    declare_queryable("Sensor/Read/ImageQuality", q_readImageQuality, qable_readImageQuality);
+
+    declare_queryable("Sensor/Write/ResolutionX", q_writeResolutionX, qable_writeResolutionX);
+    declare_queryable("Sensor/Write/ResolutionY", q_writeResolutionY, qable_writeResolutionY);
+    declare_queryable("Sensor/Write/LaserDriveCurrent", q_writeLaserDriveCurrent, qable_writeLaserDriveCurrent);
+
+    declare_queryable("Publisher/Read/Start", q_start, qable_publisherStart);
+    declare_queryable("Publisher/Read/Stop", q_stop, qable_publisherStop);
+    declare_queryable("Publisher/Write/SetFrequency", q_setFrequency, qable_publisherFrequency);
 }
 
 void Z_PAA5102E1_Handler::loop()
