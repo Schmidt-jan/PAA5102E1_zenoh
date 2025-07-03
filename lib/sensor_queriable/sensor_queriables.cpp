@@ -455,13 +455,13 @@ void q_setFrequency(z_loaned_query_t *query, void *arg)
 {
     LOG_REQ(query);
     Z_PAA5102E1_Handler *handler = static_cast<Z_PAA5102E1_Handler *>(arg);
-    const z_loaned_bytes_t *payload = z_query_payload(query);
-    auto buf_size = payload->_slices._len;
-    uint8_t buf[buf_size] = {};
-    auto req = UInt16Msg::deserialize(buf, buf_size);
-
+    size_t buf_size = 0;
+    auto buf = query_payload_to_bytes(query, &buf_size);
+    auto req = UInt32Msg::deserialize(buf, buf_size);
+    free(buf);
+    
     handler->send_freq_hz = req->value;
-
+    
     LOG_INFOF("Set publisher frequency to %d", handler->send_freq_hz);
 
     auto rep = EmptyMsg();

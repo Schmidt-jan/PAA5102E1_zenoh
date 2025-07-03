@@ -6,6 +6,7 @@
 #include <std_msg/Bool.hpp>
 #include <std_msg/Byte.hpp>
 #include <std_msg/UInt16.hpp>
+#include <std_msg/UInt32.hpp>
 #include <std_msg/Int32.hpp>
 #include <std_msg/Empty.hpp>
 #include <paa5102e1.hpp>
@@ -44,7 +45,7 @@ private:
 public:
     std::shared_ptr<PAA5102E1> sensor;
     bool sending_enabled = false;
-    uint16_t send_freq_hz = DEFAULT_PUB_FREQ_HZ;
+    uint32_t send_freq_hz = DEFAULT_PUB_FREQ_HZ;
 
     Z_PAA5102E1_Handler(
         z_loaned_session_t *session,
